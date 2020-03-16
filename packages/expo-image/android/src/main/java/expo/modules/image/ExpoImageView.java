@@ -13,11 +13,17 @@ import com.bumptech.glide.request.target.Target;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.modules.network.ProgressListener;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
 
 import java.lang.ref.WeakReference;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatImageView;
+import expo.modules.image.events.ImageErrorEvent;
+import expo.modules.image.events.ImageLoadEndEvent;
+import expo.modules.image.events.ImageLoadEvent;
+import expo.modules.image.events.ImageLoadStartEvent;
+import expo.modules.image.events.ImageProgressEvent;
 import expo.modules.image.okhttp.OkHttpClientProgressInterceptor;
 import expo.modules.image.okhttp.OkHttpClientResponseInterceptor;
 import expo.modules.image.okhttp.ResponseListener;
@@ -35,10 +41,12 @@ public class ExpoImageView extends AppCompatImageView implements ResponseListene
   private ReadableMap mSourceMap;
   private GlideUrl mLoadedSource;
   private MediaType mMediaType;
+  private RCTEventEmitter mEventEmitter;
 
   public ExpoImageView(ReactContext context, RequestManager requestManager, OkHttpClientProgressInterceptor progressInterceptor, OkHttpClientResponseInterceptor responseInterceptor) {
     super(context);
 
+    mEventEmitter = context.getJSModule(RCTEventEmitter.class);
     mRequestManager = requestManager;
     mProgressInterceptor = progressInterceptor;
     mResponseInterceptor = responseInterceptor;
@@ -62,6 +70,7 @@ public class ExpoImageView extends AppCompatImageView implements ResponseListene
     } else if (!sourceToLoad.equals(mLoadedSource)) {
       mLoadedSource = sourceToLoad;
       mMediaType = null;
+      new ImageLoadStartEvent(getId()).dispatch(mEventEmitter);
       mResponseInterceptor.registerResponseListener(sourceToLoad.toStringUrl(), this);
       mProgressInterceptor.registerProgressListener(sourceToLoad.toStringUrl(), this);
       mRequestManager
@@ -95,6 +104,7 @@ public class ExpoImageView extends AppCompatImageView implements ResponseListene
 
   @Override
   public void onProgress(long bytesWritten, long contentLength, boolean done) {
+    new ImageProgressEvent(getId(), bytesWritten, contentLength, done).dispatch(mEventEmitter);
   }
 
   private RequestListener<Drawable> createRequestListener() {
@@ -102,12 +112,20 @@ public class ExpoImageView extends AppCompatImageView implements ResponseListene
     return new RequestListener<Drawable>() {
       @Override
       public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
+        ExpoImageView view = weakThis.get();
+        if (view != null) {
+          new ImageErrorEvent(getId(), e).dispatch(view.mEventEmitter);
+        }
         onFinished(model);
         return false;
       }
 
       @Override
       public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+        ExpoImageView view = weakThis.get();
+        if (view != null) {
+          new ImageLoadEvent(getId(), resource, model, dataSource, view.mMediaType).dispatch(view.mEventEmitter);
+        }
         onFinished(model);
         return false;
       }
@@ -115,6 +133,7 @@ public class ExpoImageView extends AppCompatImageView implements ResponseListene
       private void onFinished(Object model) {
         ExpoImageView view = weakThis.get();
         if (view != null) {
+          new ImageLoadEndEvent(getId()).dispatch(view.mEventEmitter);
           if (model instanceof GlideUrl) {
             String stringUrl = ((GlideUrl) model).toStringUrl();
             view.mResponseInterceptor.unregisterResponseListener(stringUrl, view);
