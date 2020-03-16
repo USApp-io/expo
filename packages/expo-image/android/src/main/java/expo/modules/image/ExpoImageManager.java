@@ -42,6 +42,12 @@ public class ExpoImageManager extends SimpleViewManager<ExpoImageView> {
   }
 
   @Override
+  protected void onAfterUpdateTransaction(@NonNull ExpoImageView view) {
+    view.onAfterUpdateTransaction();
+    super.onAfterUpdateTransaction(view);
+  }
+
+  @Override
   public void onDropViewInstance(@NonNull ExpoImageView view) {
     view.onDrop();
     super.onDropViewInstance(view);
