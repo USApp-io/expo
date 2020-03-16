@@ -22,4 +22,19 @@ static NSString * const sourceUriKey = @"uri";
   [self sd_setImageWithURL:imageURL];
 }
 
+
+- (EXImageCacheTypeEnum)convertToCacheTypeEnum:(SDImageCacheType)imageCacheType
+{
+  switch (imageCacheType) {
+    case SDImageCacheTypeNone:
+      return EXImageCacheRemote;
+    case SDImageCacheTypeDisk:
+      return EXImageCacheDisk;
+    case SDImageCacheTypeMemory:
+      return EXImageCacheMemory;
+    default:
+      return EXImageCacheUnknown;
+  }
+}
+
 @end
